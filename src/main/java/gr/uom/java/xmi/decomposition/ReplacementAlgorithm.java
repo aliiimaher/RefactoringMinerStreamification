@@ -6546,6 +6546,60 @@ public class ReplacementAlgorithm {
 		return name.equals("stream") || name.equals("filter") || isForEach(name) || name.equals("collect") || name.equals("map") || name.equals("flatMap") || name.equals("removeIf") || name.equals("ifPresent") || name.equals("ifPresentOrElse");
 	}
 
+	protected static boolean streamPipelineOperation(AbstractCall inv) {
+		String name = inv.getName();
+		if(name.equals("stream") || name.equals("parallelStream") || name.equals("filter") || name.equals("map") || name.equals("flatMap") ||
+				name.equals("mapToInt") || name.equals("mapToLong") || name.equals("mapToDouble") || name.equals("mapToObj") ||
+				name.equals("boxed") || name.equals("distinct") || name.equals("sorted") || name.equals("limit") || name.equals("skip") ||
+				name.equals("peek") || name.equals("collect") || name.equals("reduce") ||
+				name.equals("anyMatch") || name.equals("allMatch") || name.equals("noneMatch") ||
+				name.equals("findFirst") || name.equals("findAny")) {
+			return true;
+		}
+		//static stream sources, such as Stream.of(), IntStream.range(), Stream.iterate(), only when invoked on a stream type
+		if(name.equals("of") || name.equals("range") || name.equals("rangeClosed") || name.equals("iterate") || name.equals("generate") || name.equals("concat") || name.equals("empty")) {
+			String expression = inv.getExpression();
+			return expression != null && (expression.equals("Stream") || expression.equals("IntStream") || expression.equals("LongStream") || expression.equals("DoubleStream") ||
+					expression.endsWith(".Stream") || expression.endsWith(".IntStream") || expression.endsWith(".LongStream") || expression.endsWith(".DoubleStream"));
+		}
+		return false;
+	}
+
+	private static boolean nestedInLambda(AbstractCodeFragment statement, AbstractCall inv) {
+		for(LambdaExpressionObject lambda : statement.getLambdas()) {
+			if(lambda.getLocationInfo().subsumes(inv.getLocationInfo())) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	protected static boolean isBareIterableForEach(AbstractCodeFragment statement) {
+		AbstractCall covering = statement.invocationCoveringEntireFragment();
+		if(covering == null) {
+			covering = statement.assignmentInvocationCoveringEntireStatement();
+		}
+		if(covering == null || !isForEach(covering.getName())) {
+			return false;
+		}
+		//stream operations in the receiver chain make this a pipeline; operations inside lambda arguments do not
+		for(AbstractCall inv : statement.getMethodInvocations()) {
+			if(streamPipelineOperation(inv) && !nestedInLambda(statement, inv)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	protected static boolean isStreamAPIPipeline(AbstractCodeFragment statement) {
+		for(AbstractCall inv : statement.getMethodInvocations()) {
+			if(streamPipelineOperation(inv) && !nestedInLambda(statement, inv)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	protected static List<AbstractCall> streamAPICalls(AbstractCodeFragment leaf) {
 		List<AbstractCodeFragment> list = new ArrayList<>();
 		list.add(leaf);

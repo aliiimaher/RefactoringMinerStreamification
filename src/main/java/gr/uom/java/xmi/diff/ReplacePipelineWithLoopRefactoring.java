@@ -61,6 +61,11 @@ public class ReplacePipelineWithLoopRefactoring extends AbstractRefactoring impl
 				break;
 			}
 		}
+		if(loop == null && !codeFragmentsAfter.isEmpty()) {
+			//a stream pipeline replaced with an iterable forEach() call
+			String fragment = codeFragmentsAfter.iterator().next().getString();
+			loop = fragment.contains("\n") ? fragment.substring(0, fragment.indexOf("\n")) : fragment;
+		}
 		return loop;
 	}
 

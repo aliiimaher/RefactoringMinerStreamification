@@ -55,7 +55,12 @@ public class ReplaceLoopWithPipelineRefactoring extends AbstractRefactoring impl
 				break;
 			}
 		}
-		return Optional.of(loop);
+		if(loop == null && !codeFragmentsBefore.isEmpty()) {
+			//an iterable forEach() call replaced with a stream pipeline
+			String fragment = codeFragmentsBefore.iterator().next().getString();
+			loop = fragment.contains("\n") ? fragment.substring(0, fragment.indexOf("\n")) : fragment;
+		}
+		return Optional.ofNullable(loop);
 	}
 
 	public String getTemplateParameterAfter() {
